@@ -1,0 +1,286 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String
+  name          String
+  avatar        String?
+  bio           String?
+  area          String    @default("Graphic Era Campus")
+  lat           Float     @default(30.2687)
+  lng           Float     @default(78.0076)
+  xp            Int       @default(0)
+  trustScore    Float     @default(5.0)
+  level         Int       @default(1) // 1: Newcomer, 2: Local, 3: Regular, 4: Helper, 5: Trusted, 6: Connector, 7: Community Pillar
+  isVerified    Boolean   @default(false)
+  role          String    @default("USER") // USER, MODERATOR, ADMIN
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  verification       Verification?
+  posts              Post[]               @relation("AuthorPosts")
+  interests          PostInterest[]
+  createdPlans       Plan[]               @relation("CreatedPlans")
+  groupMemberships   GroupMember[]
+  paidExpenses       Expense[]            @relation("PayerExpenses")
+  expenseShares      ExpenseParticipant[]
+  sentSettlements    Settlement[]         @relation("SentSettlements")
+  receivedSettlements Settlement[]        @relation("ReceivedSettlements")
+  chatUsers          ChatUser[]
+  sentMessages       ChatMessage[]
+  trustGiven         TrustEvent[]         @relation("RaterTrust")
+  trustReceived      TrustEvent[]         @relation("TargetTrust")
+  xpEvents           XPEvent[]
+  reportsMade        Report[]             @relation("ReporterUser")
+  reportsReceived    Report[]             @relation("TargetUser")
+  notifications      Notification[]
+  matchesReceived    PostMatch[]          @relation("MatchedUserMatches")
+}
+
+model Verification {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  studentId   String?
+  department  String?
+  campusName  String   @default("Graphic Era University")
+  documentUrl String?
+  status      String   @default("VERIFIED") // PENDING, VERIFIED, REJECTED
+  verifiedAt  DateTime @default(now())
+}
+
+model Post {
+  id               String   @id @default(uuid())
+  authorId         String
+  author           User     @relation("AuthorPosts", fields: [authorId], references: [id], onDelete: Cascade)
+  type             String   // NEED, OFFER, BORROW, LEND, BUY, SELL, GIVE, SERVICE, PLAN, RIDE, GROUP_BUY, COMMUNITY, OPPORTUNITY, LOST_FOUND
+  title            String
+  description      String
+  category         String   @default("General")
+  latitude         Float    @default(30.2687)
+  longitude        Float    @default(78.0076)
+  areaName         String   @default("Graphic Era Area")
+  radiusKm         Float    @default(2.0)
+
+  // Route fields
+  routeOrigin      String?
+  routeDestination String?
+  routeWaypoints   String?  // JSON string
+  departureTime    DateTime?
+  capacity         Int?     // For rides / group buys / plans
+
+  // Pricing / Money fields
+  price            Float?   // For sell / service / buy
+  contributionMode String?  @default("FREE") // FREE, EQUAL_SPLIT, FIXED, CUSTOM
+
+  // Lifecycle
+  status           String   @default("ACTIVE") // ACTIVE, INTERESTED, MATCHED, IN_PROGRESS, COMPLETED, EXPIRED, CANCELLED
+  expiresAt        DateTime?
+
+  tags             String?  // JSON array string
+  riskIndicators   String?  // JSON array string (AI safety indicators)
+  image            String?
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  matchesSource    PostMatch[]    @relation("SourcePostMatches")
+  matchesTarget    PostMatch[]    @relation("TargetPostMatches")
+  interests        PostInterest[]
+  plans            Plan[]
+  chats            Chat[]
+  trustEvents      TrustEvent[]
+  reports          Report[]       @relation("PostReports")
+}
+
+model PostMatch {
+  id            String   @id @default(uuid())
+  postId        String
+  post          Post     @relation("SourcePostMatches", fields: [postId], references: [id], onDelete: Cascade)
+  targetPostId  String?
+  targetPost    Post?    @relation("TargetPostMatches", fields: [targetPostId], references: [id], onDelete: Cascade)
+  matchedUserId String
+  matchedUser   User     @relation("MatchedUserMatches", fields: [matchedUserId], references: [id], onDelete: Cascade)
+  matchScore    Float    @default(0.85)
+  matchReason   String
+  status        String   @default("ACTIVE") // ACTIVE, DISMISSED, CONNECTED
+  createdAt     DateTime @default(now())
+}
+
+model PostInterest {
+  id        String   @id @default(uuid())
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status    String   @default("PENDING") // PENDING, ACCEPTED, REJECTED
+  message   String?
+  createdAt DateTime @default(now())
+}
+
+model Plan {
+  id           String   @id @default(uuid())
+  postId       String?
+  post         Post?    @relation(fields: [postId], references: [id], onDelete: SetNull)
+  creatorId    String
+  creator      User     @relation("CreatedPlans", fields: [creatorId], references: [id], onDelete: Cascade)
+  title        String
+  description  String
+  locationName String   @default("Graphic Era Campus")
+  latitude     Float    @default(30.2687)
+  longitude    Float    @default(78.0076)
+  eventTime    DateTime
+  capacity     Int      @default(5)
+  budget       Float?
+  purpose      String   @default("Hangout") // Hangout, Food, Gaming, Study, Movie, Activity, Networking, Event, Dating, Other
+  vibeTags     String?  // JSON array string
+  status       String   @default("UPCOMING") // UPCOMING, IN_PROGRESS, COMPLETED, CANCELLED
+  createdAt    DateTime @default(now())
+
+  groupMembers GroupMember[]
+  expenses     Expense[]
+  settlements  Settlement[]
+  chats        Chat[]
+}
+
+model GroupMember {
+  id        String   @id @default(uuid())
+  planId    String
+  plan      Plan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      String   @default("MEMBER") // HOST, MEMBER
+  status    String   @default("JOINED") // JOINED, LEFT, PENDING
+  createdAt DateTime @default(now())
+}
+
+model Expense {
+  id          String   @id @default(uuid())
+  planId      String
+  plan        Plan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+  payerId     String
+  payer       User     @relation("PayerExpenses", fields: [payerId], references: [id], onDelete: Cascade)
+  amount      Float
+  description String
+  isShared    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  participants ExpenseParticipant[]
+}
+
+model ExpenseParticipant {
+  id          String   @id @default(uuid())
+  expenseId   String
+  expense     Expense  @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shareAmount Float
+  createdAt   DateTime @default(now())
+}
+
+model Settlement {
+  id         String    @id @default(uuid())
+  planId     String
+  plan       Plan      @relation(fields: [planId], references: [id], onDelete: Cascade)
+  fromUserId String
+  fromUser   User      @relation("SentSettlements", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUserId   String
+  toUser     User      @relation("ReceivedSettlements", fields: [toUserId], references: [id], onDelete: Cascade)
+  amount     Float
+  status     String    @default("PENDING") // PENDING, SETTLED
+  createdAt  DateTime  @default(now())
+  settledAt  DateTime?
+}
+
+model Chat {
+  id        String   @id @default(uuid())
+  postId    String?
+  post      Post?    @relation(fields: [postId], references: [id], onDelete: SetNull)
+  planId    String?
+  plan      Plan?    @relation(fields: [planId], references: [id], onDelete: SetNull)
+  type      String   @default("DIRECT") // DIRECT, GROUP
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members  ChatUser[]
+  messages ChatMessage[]
+}
+
+model ChatUser {
+  id       String   @id @default(uuid())
+  chatId   String
+  chat     Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  joinedAt DateTime @default(now())
+}
+
+model ChatMessage {
+  id        String   @id @default(uuid())
+  chatId    String
+  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  senderId  String
+  sender    User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  text      String
+  mediaUrl  String?
+  createdAt DateTime @default(now())
+}
+
+model TrustEvent {
+  id                String   @id @default(uuid())
+  targetUserId      String
+  targetUser        User     @relation("TargetTrust", fields: [targetUserId], references: [id], onDelete: Cascade)
+  raterUserId       String
+  raterUser         User     @relation("RaterTrust", fields: [raterUserId], references: [id], onDelete: Cascade)
+  postId            String?
+  post              Post?    @relation(fields: [postId], references: [id], onDelete: SetNull)
+  scoreChange       Float    @default(0.1)
+  feedbackAttribute String   @default("Reliable") // Reliable, Helpful, On_time, Honest, Good_communicator
+  note              String?
+  createdAt         DateTime @default(now())
+}
+
+model XPEvent {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  actionType  String   // CREATE_POST, COMPLETE_EXCHANGE, HELP_NEIGHBOR, VERIFY_PROFILE, REVIEW_COMMUNITY
+  xpGained    Int
+  description String
+  createdAt   DateTime @default(now())
+}
+
+model Report {
+  id           String   @id @default(uuid())
+  reporterId   String
+  reporter     User     @relation("ReporterUser", fields: [reporterId], references: [id], onDelete: Cascade)
+  targetUserId String?
+  targetUser   User?    @relation("TargetUser", fields: [targetUserId], references: [id], onDelete: Cascade)
+  targetPostId String?
+  targetPost   Post?    @relation("PostReports", fields: [targetPostId], references: [id], onDelete: Cascade)
+  reason       String
+  status       String   @default("PENDING") // PENDING, REVIEWED, ACTIONED
+  actionTaken  String?
+  createdAt    DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  link      String?
+  type      String   @default("SYSTEM") // MATCH, CHAT, EXPENSE, TRUST, XP, SYSTEM
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
