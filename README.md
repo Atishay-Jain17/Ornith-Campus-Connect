@@ -5,10 +5,10 @@ ORNITH is a campus-first network for nearby needs, offers, rides, plans, marketp
 ## Run locally
 
 1. Install Node.js 20 or newer.
-2. Copy `.env.example` to `.env` and set a private `JWT_SECRET`.
+2. Copy `.env.example` to `.env`, set `POSTGRES_URL` to a PostgreSQL connection string, and set a private `JWT_SECRET`.
 3. Run `npm ci`.
-4. Run `npx prisma db push` to create/update the local SQLite schema.
-5. Run `npm run db:seed` only when you want to reset the local database and reload the demo data. The seed script deletes existing records first. Demo accounts use `password123`.
+4. Run `npx prisma db push` to create/update the PostgreSQL schema.
+5. Run `npm run db:seed` only against a disposable development database when you want to reset it and reload the demo data. The seed script deletes existing records first. Demo accounts use `password123`.
 6. Run `npm run dev` and open `http://localhost:3000`.
 
 The app also supports ordinary account creation and sign-in at `/auth`. New accounts remain unverified until an administrator updates their verification state.
@@ -16,8 +16,8 @@ The app also supports ordinary account creation and sign-in at `/auth`. New acco
 ## Production deployment notes
 
 - Set `JWT_SECRET` to a unique, stable random value and `NEXT_PUBLIC_APP_URL` to the public HTTPS origin.
-- The current Prisma database is SQLite. Deploy on a single Node.js service with a persistent writable disk, and set `DATABASE_URL` to a file on that disk (for example `file:/data/ornith.db`). An ephemeral/serverless filesystem will lose data across deploys or restarts. To deploy on a serverless host, migrate Prisma to a hosted PostgreSQL database first.
-- Run `npx prisma db push` against the production database before serving traffic. Do not run the demo seed command against production; it clears all existing records.
+- Prisma uses PostgreSQL through `POSTGRES_URL`. For Vercel, connect the Prisma Postgres storage resource and ensure its environment variable prefix is `POSTGRES`, which supplies `POSTGRES_URL` to Production and Preview deployments.
+- The build command runs `prisma db push` before the Next.js build so new deployments create or update the schema. Never run the demo seed command against production; it clears existing records.
 - The Android wrapper loads the hosted Next.js app. Set `CAPACITOR_SERVER_URL` to the public HTTPS origin before syncing/building the final APK. When the URL uses HTTPS, the wrapper disables cleartext traffic. The default `10.0.2.2` URL is only for a local Android emulator.
 
 PowerShell example for the final Android sync:
