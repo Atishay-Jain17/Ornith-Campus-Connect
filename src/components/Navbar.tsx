@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -10,7 +10,6 @@ import {
   Users,
   ShoppingBag,
   MessageSquare,
-  User,
   Bell,
   Sparkles,
   CheckCircle2,
@@ -33,20 +32,18 @@ const NAV_ITEMS = [
   { href: '/chat', label: 'Chat', icon: MessageSquare, activeColor: '#ED6A5A' },
 ];
 
+const demoModeEnabled = process.env.NODE_ENV !== 'production';
+
 export default function Navbar() {
   const pathname = usePathname();
   const isAuthPage = pathname === '/auth';
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [userResolved, setUserResolved] = useState(false);
   const [isSwitching, setIsSwitching] = useState(false);
   const [showDemoPicker, setShowDemoPicker] = useState(false);
 
-  useEffect(() => {
-    fetchUser();
-    setupNativeBackButton();
-  }, []);
-
-  const setupNativeBackButton = async () => {
+  const setupNativeBackButton = useCallback(async () => {
     try {
       const { App } = await import('@capacitor/app');
       App.addListener('backButton', () => {
@@ -59,17 +56,44 @@ export default function Navbar() {
     } catch {
       // Running standard browser
     }
-  };
+  }, []);
 
-  const fetchUser = async () => {
+  const fetchUser = useCallback(async () => {
     try {
-      const res = await fetch('/api/auth/me');
+      const res = await fetch('/api/auth/me', { cache: 'no-store' });
       const data = await res.json();
       setCurrentUser(data.user);
     } catch (e) {
       console.error('Failed to fetch user:', e);
+      setCurrentUser(null);
+    } finally {
+      setUserResolved(true);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    void fetchUser();
+  }, [pathname, fetchUser]);
+
+  useEffect(() => {
+    setupNativeBackButton();
+    const refreshUser = () => void fetchUser();
+    const handleAuthChanged = (event: Event) => {
+      const user = (event as CustomEvent).detail?.user;
+      if (user) {
+        setCurrentUser(user);
+        setUserResolved(true);
+      } else {
+        void fetchUser();
+      }
+    };
+    window.addEventListener('ornith:auth-changed', handleAuthChanged);
+    window.addEventListener('focus', refreshUser);
+    return () => {
+      window.removeEventListener('ornith:auth-changed', handleAuthChanged);
+      window.removeEventListener('focus', refreshUser);
+    };
+  }, [fetchUser, setupNativeBackButton]);
 
   const handleDemoSwitch = async (email: string) => {
     setIsSwitching(true);
@@ -111,7 +135,7 @@ export default function Navbar() {
         }}
       >
         {/* Demo Switcher Bar */}
-        {!isAuthPage && <div
+        {!isAuthPage && demoModeEnabled && <div
           style={{
             background: 'rgba(237,203,150,0.08)',
             borderBottom: '1px solid rgba(237,203,150,0.12)',
@@ -230,7 +254,7 @@ export default function Navbar() {
           {/* Right Actions */}
           <div className="flex items-center gap-2">
             {isAuthPage && <Link href="/feed" className="px-3 py-2 rounded-xl text-sm font-semibold text-white/75 hover:text-white">Explore Radar</Link>}
-            {!isAuthPage && !currentUser && (
+            {!isAuthPage && userResolved && !currentUser && (
               <Link href="/auth" className="px-3 py-2 rounded-xl text-sm font-bold text-white/80 hover:bg-white/10">Sign in</Link>
             )}
             {/* Notifications */}

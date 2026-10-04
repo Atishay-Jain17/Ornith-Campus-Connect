@@ -26,6 +26,7 @@ export default function AuthPage() {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Could not sign in. Please try again.');
+      window.dispatchEvent(new CustomEvent('ornith:auth-changed', { detail: { user: result.user } }));
       router.replace('/feed');
       router.refresh();
     } catch (cause) {

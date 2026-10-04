@@ -3,6 +3,12 @@ import { prisma } from '@/lib/prisma';
 import { createToken, setAuthCookie } from '@/lib/auth';
 
 export async function POST(request: Request) {
+  // Demo identity switching intentionally stays out of production: it issues a
+  // valid session for an account without proving that account's credentials.
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'Demo mode is disabled in production.' }, { status: 404 });
+  }
+
   try {
     const { email } = await request.json();
 
