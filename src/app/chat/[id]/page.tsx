@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useRef, use } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Send, ShieldCheck, User } from 'lucide-react';
+import { ArrowLeft, Send } from 'lucide-react';
 
 export default function ChatDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -58,74 +58,85 @@ export default function ChatDetailPage({ params }: { params: Promise<{ id: strin
 
   if (loading) {
     return (
-      <div className="text-center py-20">
-        <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-        <p className="text-xs text-slate-500 font-semibold">Loading chat room...</p>
+      <div className="h-screen md:h-[80vh] flex flex-col items-center justify-center bg-white md:rounded-2xl md:border border-slate-200">
+        <div className="w-8 h-8 border-4 border-[#57886C] border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p className="text-sm text-slate-500 font-medium">Loading chat...</p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-3xl mx-auto h-[80vh] flex flex-col bg-white rounded-2xl border border-slate-200 shadow-lg overflow-hidden">
+    <div className="h-[100dvh] md:h-[80vh] flex flex-col bg-[#FAFAFA] w-full max-w-3xl mx-auto md:rounded-2xl md:border border-slate-200 shadow-sm overflow-hidden relative">
       {/* Header */}
-      <div className="p-4 bg-slate-900 text-white flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Link href="/chat" className="text-slate-300 hover:text-white">
-            <ArrowLeft className="w-5 h-5" />
+      <div className="p-4 bg-[#1E1E24] text-white flex items-center justify-between shrink-0 z-10 safe-top">
+        <div className="flex items-center gap-4">
+          <Link href="/chat" className="text-slate-300 hover:text-white transition p-1 -ml-1">
+            <ArrowLeft className="w-6 h-6" />
           </Link>
-          <div>
-            <h2 className="font-bold text-sm text-white">{chat?.name || 'Chat Room'}</h2>
-            <p className="text-[11px] text-slate-400">Protected Privacy • In-App Messaging</p>
+          <div className="flex flex-col">
+            <h2 className="font-bold text-lg leading-tight text-white">{chat?.name || 'Chat Room'}</h2>
           </div>
         </div>
 
         {chat?.post && (
           <Link
             href={`/posts/${chat.post.id}`}
-            className="text-[11px] font-bold text-indigo-300 bg-indigo-900/60 px-2.5 py-1 rounded border border-indigo-700"
+            className="text-xs font-bold text-[#EDCB96] bg-white/10 hover:bg-white/20 transition px-3 py-1.5 rounded-full border border-white/10 truncate max-w-[120px]"
           >
-            Post: {chat.post.title.substring(0, 20)}...
+            {chat.post.title}
           </Link>
         )}
       </div>
 
       {/* Messages Scroll Area */}
-      <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-slate-50">
-        {messages.map((msg: any) => {
+      <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-white/50">
+        {messages.map((msg: any, index: number) => {
+          // Color coding by sender ID (mocking right-align vs left-align with colors as requested)
+          // Simple hash to alternate colors or just distinct colors based on sender ID
+          const isSender1 = messages[0] && msg.senderId === messages[0].senderId;
+          
           return (
-            <div key={msg.id} className="flex items-start gap-2 max-w-[80%]">
-              <div className="w-7 h-7 rounded-full bg-indigo-200 text-indigo-800 font-bold text-xs flex items-center justify-center shrink-0">
-                {msg.sender.name.charAt(0)}
-              </div>
-              <div>
-                <div className="text-[10px] font-bold text-slate-500 mb-0.5">{msg.sender.name}</div>
-                <div className="p-3 bg-white border border-slate-200 rounded-2xl rounded-tl-none text-slate-800 text-xs shadow-sm font-medium">
+            <div key={msg.id} className="flex flex-col items-start gap-1 w-full">
+              <div className="text-xs font-semibold text-slate-400 ml-1">{msg.sender?.name}</div>
+              <div className="flex gap-2 max-w-[85%] sm:max-w-[75%] items-end">
+                <div 
+                  className={`p-3.5 rounded-2xl text-sm font-medium shadow-sm leading-relaxed ${
+                    isSender1 
+                      ? 'bg-white border border-slate-100 text-[#1E1E24] rounded-bl-sm' 
+                      : 'bg-[#D8D8F6]/30 border border-[#D8D8F6]/50 text-[#1E1E24] rounded-bl-sm'
+                  }`}
+                >
                   {msg.text}
                 </div>
+              </div>
+              <div className="text-[10px] text-slate-400 ml-1 mt-0.5">
+                {msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
               </div>
             </div>
           );
         })}
-        <div ref={messagesEndRef} />
+        <div ref={messagesEndRef} className="h-2" />
       </div>
 
       {/* Input Box */}
-      <form onSubmit={handleSendMessage} className="p-3 bg-white border-t border-slate-200 flex items-center gap-2">
-        <input
-          type="text"
-          placeholder="Type your message..."
-          value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
-          className="flex-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
-        />
-        <button
-          type="submit"
-          disabled={!inputText.trim()}
-          className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold p-2.5 rounded-xl transition"
-        >
-          <Send className="w-4 h-4" />
-        </button>
-      </form>
+      <div className="bg-white border-t border-slate-100 p-3 pb-safe shrink-0">
+        <form onSubmit={handleSendMessage} className="flex items-center gap-3">
+          <input
+            type="text"
+            placeholder="Type your message..."
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            className="flex-1 p-3.5 bg-slate-50 border border-slate-200 rounded-full text-sm focus:outline-none focus:border-[#57886C] focus:ring-1 focus:ring-[#57886C] text-[#1E1E24] font-medium transition placeholder:text-slate-400"
+          />
+          <button
+            type="submit"
+            disabled={!inputText.trim()}
+            className="bg-[#ED6A5A] hover:bg-[#d65e4f] disabled:opacity-50 disabled:hover:bg-[#ED6A5A] text-white p-3.5 rounded-full transition shadow-sm flex items-center justify-center shrink-0"
+          >
+            <Send className="w-5 h-5 ml-0.5" />
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

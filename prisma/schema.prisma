@@ -43,6 +43,19 @@ model User {
   reportsReceived    Report[]             @relation("TargetUser")
   notifications      Notification[]
   matchesReceived    PostMatch[]          @relation("MatchedUserMatches")
+  blocksMade         UserBlock[]          @relation("BlocksMade")
+  blocksReceived     UserBlock[]          @relation("BlocksReceived")
+}
+
+model UserBlock {
+  id            String   @id @default(uuid())
+  blockerId     String
+  blockedUserId String
+  blocker       User     @relation("BlocksMade", fields: [blockerId], references: [id], onDelete: Cascade)
+  blockedUser   User     @relation("BlocksReceived", fields: [blockedUserId], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now())
+
+  @@unique([blockerId, blockedUserId])
 }
 
 model Verification {

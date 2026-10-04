@@ -43,6 +43,7 @@ export async function GET(
           },
         },
         chats: true,
+        plans: { select: { id: true, title: true } },
       },
     });
 
@@ -50,9 +51,25 @@ export async function GET(
       return NextResponse.json({ error: 'Post not found' }, { status: 404 });
     }
 
+    if (session && session.id !== post.authorId) {
+      const blocked = await prisma.userBlock.findFirst({ where: { OR: [
+        { blockerId: session.id, blockedUserId: post.authorId },
+        { blockerId: post.authorId, blockedUserId: session.id },
+      ] }, select: { id: true } });
+      if (blocked) return NextResponse.json({ error: 'Post not found' }, { status: 404 });
+    }
+
+    const isAuthor = session?.id === post.authorId;
+    const { latitude: _latitude, longitude: _longitude, ...postWithoutCoordinates } = post;
+    const publicPost = {
+      ...postWithoutCoordinates,
+      interests: isAuthor ? postWithoutCoordinates.interests : [],
+      matchesSource: isAuthor ? postWithoutCoordinates.matchesSource : [],
+      chats: isAuthor ? postWithoutCoordinates.chats : [],
+    };
     return NextResponse.json({
-      post,
-      isAuthor: session?.id === post.authorId,
+      post: publicPost,
+      isAuthor,
     });
   } catch (error) {
     console.error('Fetch post detail error:', error);

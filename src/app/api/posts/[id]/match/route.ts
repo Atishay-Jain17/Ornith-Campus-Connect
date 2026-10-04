@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { calculateMatchScore } from '@/lib/ai-engine';
+import { getCurrentUser } from '@/lib/auth';
+import { calculateDistanceKm } from '@/lib/geo';
 
 export async function GET(
   request: Request,
@@ -18,11 +20,18 @@ export async function GET(
       return NextResponse.json({ error: 'Post not found' }, { status: 404 });
     }
 
+    const session = await getCurrentUser();
+    const blocks = session ? await prisma.userBlock.findMany({ where: { OR: [
+      { blockerId: session.id }, { blockedUserId: session.id },
+    ] }, select: { blockerId: true, blockedUserId: true } }) : [];
+    const hiddenAuthors = new Set<string>();
+    for (const block of blocks) hiddenAuthors.add(block.blockerId === session?.id ? block.blockedUserId : block.blockerId);
+
     // Get all candidate active posts except author's own posts
     const candidatePosts = await prisma.post.findMany({
       where: {
         id: { not: id },
-        authorId: { not: sourcePost.authorId },
+        authorId: { notIn: [sourcePost.authorId, ...hiddenAuthors] },
         status: 'ACTIVE',
       },
       include: {
@@ -35,10 +44,11 @@ export async function GET(
     const matches: any[] = [];
 
     for (const candidate of candidatePosts) {
+      if (calculateDistanceKm(sourcePost.latitude, sourcePost.longitude, candidate.latitude, candidate.longitude) > Math.max(sourcePost.radiusKm, candidate.radiusKm)) continue;
       const matchResult = calculateMatchScore(sourcePost, candidate);
       if (matchResult.score >= 0.4) {
         matches.push({
-          targetPost: candidate,
+          targetPost: (({ latitude: _latitude, longitude: _longitude, ...publicPost }) => publicPost)(candidate),
           matchScore: matchResult.score,
           matchReason: matchResult.reason,
           matchedUser: candidate.author,

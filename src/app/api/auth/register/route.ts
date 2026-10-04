@@ -11,7 +11,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Email, password, and name are required' }, { status: 400 });
     }
 
-    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (typeof email !== 'string' || typeof password !== 'string' || typeof name !== 'string' || password.length < 8) {
+      return NextResponse.json({ error: 'Use a valid email, a name, and a password with at least 8 characters.' }, { status: 400 });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const existingUser = await prisma.user.findUnique({ where: { email: normalizedEmail } });
     if (existingUser) {
       return NextResponse.json({ error: 'User with this email already exists' }, { status: 400 });
     }
@@ -20,7 +25,7 @@ export async function POST(request: Request) {
 
     const user = await prisma.user.create({
       data: {
-        email,
+        email: normalizedEmail,
         passwordHash,
         name,
         area: area || 'Graphic Era Area',
@@ -30,7 +35,13 @@ export async function POST(request: Request) {
         xp: 100,
         trustScore: 5.0,
         level: 1,
-        isVerified: true,
+        isVerified: false,
+        verification: {
+          create: {
+            campusName: 'Graphic Era University',
+            status: 'PENDING',
+          },
+        },
       },
     });
 

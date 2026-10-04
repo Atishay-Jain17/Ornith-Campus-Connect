@@ -6,7 +6,12 @@ export async function GET() {
   try {
     const session = await getCurrentUser();
     if (!session) {
-      return NextResponse.json({ reports: [] });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: session.id }, select: { role: true } });
+    if (!user || !['MODERATOR', 'ADMIN'].includes(user.role)) {
+      return NextResponse.json({ error: 'Moderator access required' }, { status: 403 });
     }
 
     const reports = await prisma.report.findMany({
@@ -15,12 +20,37 @@ export async function GET() {
         targetUser: { select: { id: true, name: true } },
         targetPost: { select: { id: true, title: true, type: true } },
       },
+      where: { status: 'PENDING' },
       orderBy: { createdAt: 'desc' },
     });
 
     return NextResponse.json({ reports });
   } catch (error) {
     return NextResponse.json({ error: 'Failed to fetch reports' }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const session = await getCurrentUser();
+    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const user = await prisma.user.findUnique({ where: { id: session.id }, select: { role: true } });
+    if (!user || !['MODERATOR', 'ADMIN'].includes(user.role)) {
+      return NextResponse.json({ error: 'Moderator access required' }, { status: 403 });
+    }
+
+    const { reportId, status, actionTaken } = await request.json();
+    if (!reportId || !['REVIEWED', 'ACTIONED'].includes(status)) {
+      return NextResponse.json({ error: 'Choose a valid report action.' }, { status: 400 });
+    }
+    const report = await prisma.report.update({
+      where: { id: reportId },
+      data: { status, actionTaken: typeof actionTaken === 'string' ? actionTaken.slice(0, 500) : null },
+    });
+    return NextResponse.json({ report });
+  } catch (error) {
+    console.error('Moderation update error:', error);
+    return NextResponse.json({ error: 'Failed to update report' }, { status: 500 });
   }
 }
 
@@ -32,6 +62,12 @@ export async function POST(request: Request) {
     }
 
     const { targetUserId, targetPostId, reason } = await request.json();
+    if ((!targetUserId && !targetPostId) || (targetUserId && targetPostId) || typeof reason !== 'string' || !reason.trim()) {
+      return NextResponse.json({ error: 'Choose one user or post and provide a reason.' }, { status: 400 });
+    }
+    if (targetUserId === session.id) {
+      return NextResponse.json({ error: 'You cannot report yourself.' }, { status: 400 });
+    }
 
     const report = await prisma.report.create({
       data: {

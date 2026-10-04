@@ -28,7 +28,13 @@ export async function POST(
       return NextResponse.json({ error: 'Plan not found' }, { status: 404 });
     }
 
+    const isJoinedMember = plan.groupMembers.some((member) => member.userId === session.id && member.status === 'JOINED');
+    if (!isJoinedMember) return NextResponse.json({ error: 'Join the plan before adding expenses.' }, { status: 403 });
+
     const totalAmount = parseFloat(amount);
+    if (!Number.isFinite(totalAmount) || totalAmount <= 0 || typeof description !== 'string' || !description.trim()) {
+      return NextResponse.json({ error: 'Enter a positive amount and a short description.' }, { status: 400 });
+    }
     const isSharedBool = isShared !== false;
 
     // Determine target beneficiaries
@@ -41,7 +47,12 @@ export async function POST(
       targetUserIds = participantUserIds;
     } else {
       // Default shared -> all plan group members
-      targetUserIds = plan.groupMembers.map((m) => m.userId);
+      targetUserIds = plan.groupMembers.filter((m) => m.status === 'JOINED').map((m) => m.userId);
+    }
+
+    const joinedIds = new Set(plan.groupMembers.filter((member) => member.status === 'JOINED').map((member) => member.userId));
+    if (targetUserIds.some((userId) => !joinedIds.has(userId))) {
+      return NextResponse.json({ error: 'Expenses can only be shared with current plan members.' }, { status: 400 });
     }
 
     const perPersonShare = targetUserIds.length > 0 ? Math.round((totalAmount / targetUserIds.length) * 100) / 100 : totalAmount;

@@ -37,6 +37,16 @@ export async function GET(
     if (!isMember) {
       return NextResponse.json({ error: 'Forbidden. You are not a member of this chat.' }, { status: 403 });
     }
+    if (chat.type === 'DIRECT' && session) {
+      const other = chat.members.find((member) => member.userId !== session.id);
+      if (other) {
+        const blocked = await prisma.userBlock.findFirst({ where: { OR: [
+          { blockerId: session.id, blockedUserId: other.userId },
+          { blockerId: other.userId, blockedUserId: session.id },
+        ] }, select: { id: true } });
+        if (blocked) return NextResponse.json({ error: 'This conversation is unavailable.' }, { status: 403 });
+      }
+    }
 
     return NextResponse.json({ chat });
   } catch (error) {
@@ -68,6 +78,18 @@ export async function POST(
 
     if (!chatMember) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const chat = await prisma.chat.findUnique({ where: { id }, include: { members: true } });
+    if (chat?.type === 'DIRECT') {
+      const other = chat.members.find((member) => member.userId !== session.id);
+      if (other) {
+        const blocked = await prisma.userBlock.findFirst({ where: { OR: [
+          { blockerId: session.id, blockedUserId: other.userId },
+          { blockerId: other.userId, blockedUserId: session.id },
+        ] }, select: { id: true } });
+        if (blocked) return NextResponse.json({ error: 'This conversation is unavailable.' }, { status: 403 });
+      }
     }
 
     const message = await prisma.chatMessage.create({

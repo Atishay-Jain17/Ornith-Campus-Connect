@@ -296,20 +296,37 @@ async function main() {
   });
 
   // 3. Create Plan with Group & Expenses (Demo Story 5: Plan + Expense Settlement)
+  const cafeEventTime = new Date(Date.now() + 24 * 3600 * 1000);
   const cafePlan = await prisma.plan.create({
     data: {
-      creatorId: userAarav.id,
+      creator: { connect: { id: userAarav.id } },
       title: 'Weekend Café Hangout & Pizza Party',
       description: 'Gathering at Out of Oven Café near Clement Town for pizza, code chatter, and card games!',
       locationName: 'Out of Oven Café, Clement Town',
       latitude: 30.2690,
       longitude: 78.0080,
-      eventTime: new Date(Date.now() + 24 * 3600 * 1000), // Tomorrow
+      eventTime: cafeEventTime,
       capacity: 6,
       budget: 300,
       purpose: 'Food',
       vibeTags: JSON.stringify(['Casual', 'Pizza', 'Games', 'Chai']),
-      status: 'UPCOMING'
+      status: 'UPCOMING',
+      post: {
+        create: {
+          author: { connect: { id: userAarav.id } },
+          type: 'PLAN',
+          title: 'Weekend Café Hangout & Pizza Party',
+          description: 'Gathering at Out of Oven Café near Clement Town for pizza, code chatter, and card games!',
+          category: 'Food',
+          areaName: 'Graphic Era Area',
+          latitude: 30.2687,
+          longitude: 78.0076,
+          radiusKm: 2,
+          capacity: 6,
+          expiresAt: cafeEventTime,
+          tags: JSON.stringify(['Casual', 'Pizza', 'Games', 'Chai']),
+        },
+      },
     }
   });
 
@@ -321,6 +338,16 @@ async function main() {
       { planId: cafePlan.id, userId: userRohan.id, role: 'MEMBER', status: 'JOINED' },
       { planId: cafePlan.id, userId: userAtishay.id, role: 'MEMBER', status: 'JOINED' }
     ]
+  });
+
+  await prisma.chat.create({
+    data: {
+      planId: cafePlan.id,
+      type: 'GROUP',
+      name: `${cafePlan.title} · group chat`,
+      members: { create: [userAarav.id, userShreya.id, userRohan.id, userAtishay.id].map((userId) => ({ userId })) },
+      messages: { create: { senderId: userAarav.id, text: 'Welcome! Let’s meet at the café entrance at 5 PM.' } },
+    },
   });
 
   // Create Expenses as per PDF spec:

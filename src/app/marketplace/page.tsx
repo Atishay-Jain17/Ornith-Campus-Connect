@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ShoppingBag, Search, MapPin, Tag, PlusCircle, ArrowRight, ShieldCheck } from 'lucide-react';
+import { ShoppingBag, Search, MapPin, Tag, PlusCircle, ArrowRight, ShieldCheck, HelpCircle } from 'lucide-react';
 import { formatDistance } from '@/lib/geo';
 
 export default function MarketplacePage() {
@@ -25,9 +25,11 @@ export default function MarketplacePage() {
       const filtered = allPosts.filter((p: any) => {
         if (activeTab === 'SERVICES') return p.type === 'SERVICE';
         if (activeTab === 'GIVEAWAY') return p.type === 'GIVE';
-        if (activeTab === 'BORROW_LEND') return p.type === 'BORROW' || p.type === 'LEND';
+        if (activeTab === 'BORROW_LEND') return ['BORROW', 'LEND'].includes(p.type);
         if (activeTab === 'SELL_BUY') return p.type === 'SELL' || p.type === 'BUY';
-        return ['SERVICE', 'GIVE', 'BORROW', 'LEND', 'SELL', 'BUY'].includes(p.type);
+        if (activeTab === 'RENT') return p.type === 'RENT';
+        if (activeTab === 'GROUP_BUY') return p.type === 'GROUP_BUY';
+        return ['SERVICE', 'GIVE', 'BORROW', 'LEND', 'SELL', 'BUY', 'RENT', 'GROUP_BUY'].includes(p.type);
       });
 
       setItems(filtered);
@@ -38,24 +40,39 @@ export default function MarketplacePage() {
     }
   };
 
+  const getTypeStyle = (type: string) => {
+    if (['BUY', 'NEED'].includes(type)) {
+      return { 
+        bg: 'bg-[#ED6A5A]/10', 
+        text: 'text-[#ED6A5A]', 
+        icon: <Search className="w-3.5 h-3.5" /> 
+      };
+    }
+    return { 
+      bg: 'bg-[#57886C]/10', 
+      text: 'text-[#57886C]', 
+      icon: <Tag className="w-3.5 h-3.5" /> 
+    };
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-7xl mx-auto pb-20 md:pb-8">
       {/* Banner */}
-      <div className="bg-gradient-to-r from-purple-900 to-slate-900 text-white p-6 rounded-2xl shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-[#D8D8F6] border border-[#A0A0E8]/35 p-6 sm:p-8 rounded-[22px] shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 text-xs font-semibold mb-2 border border-purple-400/30">
-            <ShoppingBag className="w-3.5 h-3.5 text-purple-400" />
-            <span>HYPERLOCAL COMMUNITY EXCHANGE</span>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/75 text-[#1E1E24] text-[10px] font-bold uppercase tracking-[.16em] mb-3">
+            <ShoppingBag className="w-3.5 h-3.5" />
+            <span>COMMUNITY EXCHANGE</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-white">Marketplace, Borrow & Services</h1>
-          <p className="text-slate-300 text-xs mt-1 max-w-xl">
+          <h1 className="font-serif text-3xl sm:text-4xl leading-[1.04] tracking-[-.04em] text-[#1E1E24]">Good finds, close by.</h1>
+          <p className="text-[#1E1E24]/70 text-sm mt-2 max-w-xl">
             Borrow laptops & chargers, buy/sell campus items, get tutoring or PPT design, and collect free giveaways.
           </p>
         </div>
 
         <Link
           href="/posts/create"
-          className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-4 py-2.5 rounded-xl text-xs shadow-md flex items-center gap-1.5 self-start md:self-auto"
+          className="bg-[#ED6A5A] hover:bg-[#d95647] text-white font-bold px-5 py-3 rounded-xl text-sm flex items-center justify-center gap-2 self-stretch md:self-auto transition-colors shadow-sm"
         >
           <PlusCircle className="w-4 h-4" />
           <span>Post Listing</span>
@@ -63,21 +80,23 @@ export default function MarketplacePage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto">
+      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
         {[
           { id: 'ALL', label: 'All Listings' },
-          { id: 'BORROW_LEND', label: '🤝 Borrow & Lend' },
-          { id: 'SELL_BUY', label: '🛍️ Buy & Sell' },
-          { id: 'SERVICES', label: '🛠️ Tutoring & Services' },
-          { id: 'GIVEAWAY', label: '🎁 Free Giveaways' },
+          { id: 'BORROW_LEND', label: 'Borrow & Lend' },
+          { id: 'SELL_BUY', label: 'Buy & Sell' },
+          { id: 'SERVICES', label: 'Services' },
+          { id: 'GIVEAWAY', label: 'Free' },
+          { id: 'RENT', label: 'Rentals' },
+          { id: 'GROUP_BUY', label: 'Group Buy' },
         ].map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
+            className={`px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-colors ${
               activeTab === tab.id
-                ? 'bg-purple-600 text-white shadow-sm'
-                : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                ? 'bg-[#1E1E24] text-white'
+                : 'bg-white text-[#1E1E24] border border-[#1E1E24]/10 hover:bg-[#1E1E24]/5'
             }`}
           >
             {tab.label}
@@ -87,53 +106,68 @@ export default function MarketplacePage() {
 
       {/* Grid */}
       {loading ? (
-        <div className="text-center py-16">
-          <div className="w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-          <p className="text-xs font-semibold text-slate-500">Loading marketplace listings...</p>
+        <div className="text-center py-20 bg-white rounded-2xl border border-[#1E1E24]/5 shadow-sm">
+          <div className="w-8 h-8 border-4 border-[#D8D8F6] border-t-[#1E1E24] rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-sm font-semibold text-[#1E1E24]/60">Discovering items nearby...</p>
         </div>
       ) : items.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-xl border border-slate-200 p-8">
-          <ShoppingBag className="w-12 h-12 text-slate-300 mx-auto mb-2" />
-          <h3 className="font-bold text-slate-800">No marketplace listings in this category</h3>
+        <div className="text-center py-20 bg-white rounded-2xl border border-[#1E1E24]/5 shadow-sm flex flex-col items-center justify-center">
+          <div className="w-16 h-16 bg-[#F7F7F5] rounded-full flex items-center justify-center mb-4">
+            <Search className="w-8 h-8 text-[#1E1E24]/40" />
+          </div>
+          <h3 className="font-bold text-lg text-[#1E1E24]">No listings found</h3>
+          <p className="text-[#1E1E24]/60 text-sm mt-1 max-w-sm mx-auto">Be the first to post something in this category and help out your community.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {items.map((item) => (
-            <div key={item.id} className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-3 hover:border-purple-300 transition flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="bg-purple-100 text-purple-900 px-2.5 py-0.5 rounded text-[11px] font-extrabold uppercase">
-                    {item.type}
-                  </span>
-                  <span className="text-xs font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
-                    {item.price ? `₹${item.price}` : 'FREE / BORROW'}
-                  </span>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-5">
+          {items.map((item) => {
+            const style = getTypeStyle(item.type);
+            
+            return (
+              <div key={item.id} className="bg-white rounded-2xl border border-[#1E1E24]/10 p-3 md:p-5 shadow-sm flex flex-col justify-between hover:-translate-y-1 hover:shadow-lg transition-all">
+                <div>
+                  <div className={`mb-4 h-2 w-full ${style.bg}`} />
+                  <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+                    <span className={`px-2 py-1 rounded-md text-[10px] md:text-xs font-bold uppercase flex items-center gap-1 ${style.bg} ${style.text}`}>
+                      {style.icon}
+                      {item.type}
+                    </span>
+                    <span className="text-[10px] md:text-xs font-bold text-[#1E1E24] bg-[#F7F7F5] px-2 py-1 rounded-md border border-[#1E1E24]/5">
+                      {item.price ? `₹${item.price}` : 'FREE'}
+                    </span>
+                  </div>
+
+                  <h3 className="font-serif text-[#1E1E24] text-base md:text-xl leading-tight mb-1.5 line-clamp-2">{item.title}</h3>
+                  <p className="text-[#1E1E24]/60 text-xs md:text-sm line-clamp-2 mb-3">{item.description}</p>
                 </div>
 
-                <h3 className="font-extrabold text-slate-900 text-base">{item.title}</h3>
-                <p className="text-slate-600 text-xs mt-1 line-clamp-2">{item.description}</p>
-              </div>
-
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-full bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center">
-                    {item.author.name.charAt(0)}
+                <div className="mt-auto space-y-3">
+                  <div className="flex items-center text-[#1E1E24]/60 text-[10px] md:text-xs font-medium bg-[#FAFAFA] px-2 py-1.5 rounded-lg border border-[#1E1E24]/5">
+                    <MapPin className="w-3 h-3 mr-1 shrink-0" />
+                    <span className="truncate">{typeof item.distanceKm === 'number' ? formatDistance(item.distanceKm) : 'Nearby'}</span>
                   </div>
-                  <div className="text-xs font-bold text-slate-800">
-                    {item.author.name} ({item.author.trustScore}★)
+                  
+                  <div className="pt-3 border-t border-[#1E1E24]/5 flex flex-col xl:flex-row xl:items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-6 h-6 rounded-full bg-[#D8D8F6] text-[#1E1E24] font-bold text-xs flex items-center justify-center shrink-0">
+                        {item.author.name.charAt(0)}
+                      </div>
+                      <div className="text-[10px] md:text-xs font-bold text-[#1E1E24] truncate">
+                        {item.author.name} <span className="text-[#EDCB96]">★</span>{item.author.trustScore}
+                      </div>
+                    </div>
+
+                    <Link
+                      href={`/posts/${item.id}`}
+                      className="bg-[#1E1E24] hover:bg-[#2a2a32] text-white text-[10px] md:text-xs font-bold px-3 py-1.5 rounded-lg flex items-center justify-center gap-1 transition-colors shrink-0"
+                    >
+                      <span>Connect</span>
+                    </Link>
                   </div>
                 </div>
-
-                <Link
-                  href={`/posts/${item.id}`}
-                  className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1"
-                >
-                  <span>Connect & Trade</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

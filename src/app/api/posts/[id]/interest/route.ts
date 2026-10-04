@@ -24,11 +24,21 @@ export async function POST(
       return NextResponse.json({ error: 'Post not found' }, { status: 404 });
     }
 
+    const blocked = await prisma.userBlock.findFirst({ where: { OR: [
+      { blockerId: session.id, blockedUserId: post.authorId },
+      { blockerId: post.authorId, blockedUserId: session.id },
+    ] }, select: { id: true } });
+    if (blocked) return NextResponse.json({ error: 'This connection is unavailable.' }, { status: 403 });
+
     // Accept / Reject Interest
     if (action === 'ACCEPT' || action === 'REJECT') {
       if (post.authorId !== session.id) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
       }
+
+      const requestedInterest = await prisma.postInterest.findFirst({ where: { id: interestId, postId: post.id } });
+      if (!requestedInterest) return NextResponse.json({ error: 'Interest not found for this post.' }, { status: 404 });
+      if (requestedInterest.status !== 'PENDING') return NextResponse.json({ error: 'This interest has already been handled.' }, { status: 409 });
 
       const updatedInterest = await prisma.postInterest.update({
         where: { id: interestId },
@@ -99,6 +109,9 @@ export async function POST(
     }
 
     // Express Interest
+    if (post.authorId === session.id) {
+      return NextResponse.json({ error: 'You cannot express interest in your own post.' }, { status: 400 });
+    }
     const existingInterest = await prisma.postInterest.findFirst({
       where: { postId: id, userId: session.id },
     });

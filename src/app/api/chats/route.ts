@@ -48,6 +48,12 @@ export async function POST(request: Request) {
     const { targetUserId, postId, planId, name } = await request.json();
 
     if (targetUserId) {
+      if (targetUserId === session.id) return NextResponse.json({ error: 'Cannot start a chat with yourself.' }, { status: 400 });
+      const block = await prisma.userBlock.findFirst({ where: { OR: [
+        { blockerId: session.id, blockedUserId: targetUserId },
+        { blockerId: targetUserId, blockedUserId: session.id },
+      ] }, select: { id: true } });
+      if (block) return NextResponse.json({ error: 'This connection is unavailable.' }, { status: 403 });
       // Find or create direct chat
       let chat = await prisma.chat.findFirst({
         where: {

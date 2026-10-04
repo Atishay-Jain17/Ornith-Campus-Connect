@@ -1,7 +1,7 @@
 import { calculateDistanceKm, calculateRouteOverlap } from './geo';
 
 export interface ExtractedIntent {
-  type: 'NEED' | 'OFFER' | 'BORROW' | 'LEND' | 'BUY' | 'SELL' | 'GIVE' | 'SERVICE' | 'PLAN' | 'RIDE' | 'GROUP_BUY' | 'COMMUNITY' | 'OPPORTUNITY' | 'LOST_FOUND';
+  type: 'NEED' | 'OFFER' | 'BORROW' | 'LEND' | 'BUY' | 'SELL' | 'GIVE' | 'RENT' | 'SERVICE' | 'PLAN' | 'RIDE' | 'GROUP_BUY' | 'COMMUNITY' | 'OPPORTUNITY' | 'LOST_FOUND';
   title: string;
   category: string;
   radiusKm: number;
@@ -43,7 +43,17 @@ export function extractIntentFromText(rawText: string): ExtractedIntent {
     }
   }
 
-  if (text.includes('borrow') || text.includes('for 2 hours') || text.includes('for tonight') || text.includes('for 3 hours')) {
+  if (text.includes('lost') || text.includes('found')) {
+    type = 'LOST_FOUND';
+    category = 'Lost / Found';
+  } else if (text.includes('group buy') || text.includes('bulk order') || text.includes('ordering together') || text.includes('anyone wants one')) {
+    type = 'GROUP_BUY';
+    category = 'Group Buy';
+    contributionMode = 'EQUAL_SPLIT';
+  } else if (text.includes('looking to rent') || text.includes('available to rent') || text.includes('renting out') || text.includes('for rent')) {
+    type = 'RENT';
+    category = 'Marketplace / Rent';
+  } else if (text.includes('borrow') || text.includes('for 2 hours') || text.includes('for tonight') || text.includes('for 3 hours')) {
     type = 'BORROW';
     category = 'Electronics / Lend';
   } else if (text.includes('can lend') || text.includes('spare') || text.includes('have extra') || text.includes('available to lend')) {
@@ -56,6 +66,9 @@ export function extractIntentFromText(rawText: string): ExtractedIntent {
     type = 'SELL';
     category = 'Marketplace';
     contributionMode = 'FIXED';
+  } else if (text.includes('buy') || text.includes('looking for a') || text.includes('want to purchase')) {
+    type = 'BUY';
+    category = 'Marketplace';
   } else if (text.includes('cafe') || text.includes('hangout') || text.includes('pizza') || text.includes('party') || text.includes('meetup') || text.includes('movie')) {
     type = 'PLAN';
     category = 'Social / Hangout';
@@ -69,6 +82,9 @@ export function extractIntentFromText(rawText: string): ExtractedIntent {
   } else if (text.includes('internship') || text.includes('hiring') || text.includes('stipend') || text.includes('freelance work')) {
     type = 'OPPORTUNITY';
     category = 'Opportunities';
+  } else if (text.includes('recommend') || text.includes('recommendation') || text.includes('campus tip') || text.includes('announcement') || text.includes('lost my')) {
+    type = 'COMMUNITY';
+    category = 'Campus Community';
   } else if (text.includes('need') || text.includes('looking for') || text.includes('require')) {
     type = 'NEED';
     category = 'Help / Need';
@@ -168,6 +184,10 @@ export function calculateMatchScore(
     (sourcePost.type === 'NEED' && (targetPost.type === 'OFFER' || targetPost.type === 'LEND' || targetPost.type === 'GIVE')) ||
     (sourcePost.type === 'OFFER' && (targetPost.type === 'NEED' || targetPost.type === 'BUY')) ||
     (sourcePost.type === 'BORROW' && targetPost.type === 'LEND') ||
+    (sourcePost.type === 'BORROW' && targetPost.type === 'RENT') ||
+    (sourcePost.type === 'RENT' && ['NEED', 'BORROW', 'RENT'].includes(targetPost.type)) ||
+    (sourcePost.type === 'NEED' && ['SERVICE', 'RENT'].includes(targetPost.type)) ||
+    (sourcePost.type === 'LOST_FOUND' && targetPost.type === 'LOST_FOUND') ||
     (sourcePost.type === 'BUY' && targetPost.type === 'SELL') ||
     (sourcePost.type === 'RIDE' && targetPost.type === 'NEED') ||
     (sourcePost.type === 'NEED' && targetPost.type === 'RIDE')

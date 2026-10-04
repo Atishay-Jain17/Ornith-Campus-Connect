@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import jwt from 'jsonwebtoken';
 import { prisma } from './prisma';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'community_network_ornith_super_secret_jwt_key_2026';
+const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? '' : 'community_network_ornith_dev_only_secret');
 const TOKEN_NAME = 'ornith_token';
 
 export interface UserSession {
@@ -14,6 +14,7 @@ export interface UserSession {
 }
 
 export function createToken(user: { id: string; email: string; name: string; level: number; isVerified: boolean }) {
+  if (!JWT_SECRET) throw new Error('JWT_SECRET must be configured in production.');
   return jwt.sign(
     {
       id: user.id,
@@ -29,6 +30,7 @@ export function createToken(user: { id: string; email: string; name: string; lev
 
 export function verifyToken(token: string): UserSession | null {
   try {
+    if (!JWT_SECRET) return null;
     return jwt.verify(token, JWT_SECRET) as UserSession;
   } catch (error) {
     return null;

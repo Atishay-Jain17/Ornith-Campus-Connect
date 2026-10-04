@@ -37,7 +37,7 @@ export async function GET(
             toUser: { select: { id: true, name: true } },
           },
         },
-        chats: true,
+        chats: { select: { id: true, name: true, type: true } },
       },
     });
 
@@ -46,7 +46,7 @@ export async function GET(
     }
 
     // Compute live settlement calculation engine
-    const memberList = plan.groupMembers.map((gm) => ({
+    const memberList = plan.groupMembers.filter((gm) => gm.status === 'JOINED').map((gm) => ({
       userId: gm.userId,
       userName: gm.user.name,
     }));
@@ -67,13 +67,23 @@ export async function GET(
 
     const settlementEngineResult = calculatePlanSettlement(memberList, expenseItems);
 
-    const isMember = plan.groupMembers.some((gm) => gm.userId === session?.id);
+    const isMember = plan.groupMembers.some((gm) => gm.userId === session?.id && gm.status === 'JOINED');
+    const isPending = plan.groupMembers.some((gm) => gm.userId === session?.id && gm.status === 'PENDING');
     const isHost = plan.creatorId === session?.id;
+    const visiblePlan = {
+      ...plan,
+      latitude: undefined,
+      longitude: undefined,
+      groupMembers: plan.groupMembers.filter((member) => member.status === 'JOINED' || isHost),
+      expenses: isMember ? plan.expenses : [],
+      settlements: isMember ? plan.settlements : [],
+    };
 
     return NextResponse.json({
-      plan,
-      settlementSummary: settlementEngineResult,
+      plan: visiblePlan,
+      settlementSummary: isMember ? settlementEngineResult : null,
       isMember,
+      isPending,
       isHost,
     });
   } catch (error) {
@@ -93,7 +103,7 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { action } = await request.json();
+    const { action, memberId } = await request.json();
 
     const plan = await prisma.plan.findUnique({
       where: { id },
@@ -107,10 +117,11 @@ export async function POST(
     if (action === 'JOIN') {
       const existingMember = plan.groupMembers.find((gm) => gm.userId === session.id);
       if (existingMember) {
-        return NextResponse.json({ message: 'Already a group member' });
+        return NextResponse.json({ message: existingMember.status === 'PENDING' ? 'Your request is awaiting host approval.' : 'Already a group member', status: existingMember.status });
       }
 
-      if (plan.groupMembers.length >= plan.capacity) {
+      const joinedCount = plan.groupMembers.filter((member) => member.status === 'JOINED').length;
+      if (joinedCount >= plan.capacity) {
         return NextResponse.json({ error: 'Plan capacity reached' }, { status: 400 });
       }
 
@@ -119,26 +130,45 @@ export async function POST(
           planId: id,
           userId: session.id,
           role: 'MEMBER',
-          status: 'JOINED',
+          status: 'PENDING',
         },
       });
 
-      // Notify plan creator
+      // Hosts approve each request before a stranger joins.
       await prisma.notification.create({
         data: {
           userId: plan.creatorId,
-          title: '🎉 New Plan Participant',
-          message: `${session.name} joined your plan: "${plan.title}"`,
+          title: '👋 Plan join request',
+          message: `${session.name} asked to join "${plan.title}". Review the request before they join.`,
           link: `/plans/${plan.id}`,
           type: 'SYSTEM',
         },
       });
 
-      return NextResponse.json({ member });
+      return NextResponse.json({ member, message: 'Request sent. The host will review it.' });
+    } else if (action === 'APPROVE' || action === 'REJECT') {
+      if (plan.creatorId !== session.id) return NextResponse.json({ error: 'Only the host can review join requests.' }, { status: 403 });
+      const requestedMember = await prisma.groupMember.findFirst({ where: { id: memberId, planId: id, status: 'PENDING' } });
+      if (!requestedMember) return NextResponse.json({ error: 'Join request not found.' }, { status: 404 });
+      if (action === 'APPROVE') {
+        const joinedCount = await prisma.groupMember.count({ where: { planId: id, status: 'JOINED' } });
+        if (joinedCount >= plan.capacity) return NextResponse.json({ error: 'Plan capacity reached.' }, { status: 409 });
+        await prisma.groupMember.update({ where: { id: requestedMember.id }, data: { status: 'JOINED' } });
+        const groupChat = await prisma.chat.findFirst({ where: { planId: id }, select: { id: true } });
+        if (groupChat) await prisma.chatUser.create({ data: { chatId: groupChat.id, userId: requestedMember.userId } });
+        await prisma.notification.create({ data: { userId: requestedMember.userId, title: 'You’re in!', message: `The host accepted your request to join "${plan.title}".`, link: `/plans/${plan.id}`, type: 'SYSTEM' } });
+      } else {
+        await prisma.groupMember.delete({ where: { id: requestedMember.id } });
+        await prisma.notification.create({ data: { userId: requestedMember.userId, title: 'Plan request update', message: `The host could not add you to "${plan.title}" this time.`, link: `/plans/${plan.id}`, type: 'SYSTEM' } });
+      }
+      return NextResponse.json({ success: true });
     } else if (action === 'LEAVE') {
+      if (plan.creatorId === session.id) return NextResponse.json({ error: 'The host cannot leave their own plan.' }, { status: 400 });
       await prisma.groupMember.deleteMany({
         where: { planId: id, userId: session.id },
       });
+      const groupChat = await prisma.chat.findFirst({ where: { planId: id }, select: { id: true } });
+      if (groupChat) await prisma.chatUser.deleteMany({ where: { chatId: groupChat.id, userId: session.id } });
       return NextResponse.json({ message: 'Left plan successfully' });
     }
 

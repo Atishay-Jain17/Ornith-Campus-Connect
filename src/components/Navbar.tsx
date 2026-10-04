@@ -5,31 +5,41 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   Radio,
-  PlusCircle,
+  Plus,
   Car,
   Users,
   ShoppingBag,
   MessageSquare,
-  ShieldAlert,
   User,
   Bell,
   Sparkles,
   CheckCircle2,
+  ChevronDown,
 } from 'lucide-react';
 
 export const DEMO_USERS = [
-  { email: 'aarav@geu.ac.in', name: 'Aarav (L5)', role: 'Tech Lead / Poster' },
-  { email: 'ananya@geu.ac.in', name: 'Ananya (L3)', role: 'Lender / Designer' },
-  { email: 'rohan@geu.ac.in', name: 'Rohan (L2)', role: 'Driver / Carpool' },
-  { email: 'shreya@geu.ac.in', name: 'Shreya (L3)', role: 'Passenger / Foodie' },
-  { email: 'atishay@geu.ac.in', name: 'Atishay (L6)', role: 'Giver / Coder' },
+  { email: 'aarav@geu.ac.in', name: 'Aarav', role: 'Tech Lead / Poster' },
+  { email: 'ananya@geu.ac.in', name: 'Ananya', role: 'Lender / Designer' },
+  { email: 'rohan@geu.ac.in', name: 'Rohan', role: 'Driver / Carpool' },
+  { email: 'shreya@geu.ac.in', name: 'Shreya', role: 'Passenger / Foodie' },
+  { email: 'atishay@geu.ac.in', name: 'Atishay', role: 'Giver / Coder' },
+];
+
+const NAV_ITEMS = [
+  { href: '/feed', label: 'Radar', icon: Radio, activeColor: '#ED6A5A' },
+  { href: '/rides', label: 'Rides', icon: Car, activeColor: '#57886C' },
+  { href: '/plans', label: 'Plans', icon: Users, activeColor: '#EDCB96' },
+  { href: '/marketplace', label: 'Market', icon: ShoppingBag, activeColor: '#D8D8F6' },
+  { href: '/chat', label: 'Chat', icon: MessageSquare, activeColor: '#ED6A5A' },
 ];
 
 export default function Navbar() {
   const pathname = usePathname();
+  const isAuthPage = pathname === '/auth';
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isSwitching, setIsSwitching] = useState(false);
+  const [showDemoPicker, setShowDemoPicker] = useState(false);
 
   useEffect(() => {
     fetchUser();
@@ -38,7 +48,6 @@ export default function Navbar() {
 
   const setupNativeBackButton = async () => {
     try {
-      // Dynamic import to support Capacitor native app back button
       const { App } = await import('@capacitor/app');
       App.addListener('backButton', () => {
         if (window.location.pathname === '/feed' || window.location.pathname === '/') {
@@ -73,6 +82,7 @@ export default function Navbar() {
       if (res.ok) {
         await fetchUser();
         router.refresh();
+        setShowDemoPicker(false);
       }
     } catch (e) {
       console.error(e);
@@ -81,216 +91,276 @@ export default function Navbar() {
     }
   };
 
+  const isActive = (href: string) => {
+    if (href === '/feed') return pathname === '/feed' || pathname === '/';
+    if (href === '/plans') return pathname.startsWith('/plans');
+    if (href === '/chat') return pathname.startsWith('/chat');
+    return pathname === href;
+  };
+
+  const getInitials = (name: string) => name ? name.charAt(0).toUpperCase() : '?';
+
   return (
     <>
-      <header className="sticky top-0 z-50 bg-white border-b border-slate-200 shadow-sm">
+      {/* ── TOP HEADER ── */}
+      <header
+        className="sticky top-0 z-50"
+        style={{
+          background: '#1E1E24',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+        }}
+      >
         {/* Demo Switcher Bar */}
-        <div className="bg-slate-900 text-white text-xs py-1.5 px-4 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span className="font-semibold text-amber-300">DEMO PROFILE SWITCHER:</span>
-            <span className="hidden sm:inline text-slate-300">Switch identity to test end-to-end interactions</span>
+        {!isAuthPage && <div
+          style={{
+            background: 'rgba(237,203,150,0.08)',
+            borderBottom: '1px solid rgba(237,203,150,0.12)',
+          }}
+          className="px-4 py-1.5 flex items-center justify-between gap-2"
+        >
+          <div className="flex items-center gap-1.5">
+            <Sparkles className="w-3 h-3" style={{ color: '#EDCB96' }} />
+            <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#EDCB96' }}>
+              Demo Mode
+            </span>
+            <span className="text-[10px] hidden sm:inline" style={{ color: 'rgba(237,203,150,0.6)' }}>
+              — Switch identity to test features
+            </span>
           </div>
-          <div className="flex items-center gap-1.5 overflow-x-auto">
-            {DEMO_USERS.map((u) => {
-              const isSelected = currentUser?.email === u.email;
+
+          {/* Current user + dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowDemoPicker(!showDemoPicker)}
+              disabled={isSwitching}
+              className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg transition-all"
+              style={{
+                background: 'rgba(237,203,150,0.12)',
+                color: '#EDCB96',
+              }}
+            >
+              <span className="text-[11px] font-bold">
+                {isSwitching ? 'Switching...' : (currentUser?.name || 'Select User')}
+              </span>
+              <ChevronDown className="w-3 h-3" />
+            </button>
+
+            {showDemoPicker && (
+              <div
+                className="absolute right-0 top-full mt-1 z-[100] rounded-xl overflow-hidden shadow-2xl"
+                style={{ background: '#2A2A33', border: '1px solid rgba(255,255,255,0.08)', minWidth: '200px' }}
+              >
+                {DEMO_USERS.map((u) => {
+                  const isSelected = currentUser?.email === u.email;
+                  return (
+                    <button
+                      key={u.email}
+                      onClick={() => handleDemoSwitch(u.email)}
+                      disabled={isSwitching}
+                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-all"
+                      style={{
+                        background: isSelected ? 'rgba(237,106,90,0.15)' : 'transparent',
+                        borderLeft: isSelected ? '2px solid #ED6A5A' : '2px solid transparent',
+                      }}
+                    >
+                      <div
+                        className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                        style={{ background: isSelected ? '#ED6A5A' : '#3A3A45', color: '#FFFFFF' }}
+                      >
+                        {getInitials(u.name)}
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold" style={{ color: '#FFFFFF' }}>{u.name}</div>
+                        <div className="text-[10px]" style={{ color: 'rgba(255,255,255,0.4)' }}>{u.role}</div>
+                      </div>
+                      {isSelected && <CheckCircle2 className="w-3.5 h-3.5 ml-auto" style={{ color: '#ED6A5A' }} />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>}
+
+        {/* Main Header Row */}
+        <div className="px-4 sm:px-6 flex items-center justify-between h-14">
+          {/* Brand */}
+          <Link href="/feed" className="flex items-center gap-2.5 group">
+            <div
+              className="w-8 h-8 rounded-xl flex items-center justify-center font-black text-base shadow-lg"
+              style={{ background: '#ED6A5A', color: '#FFFFFF' }}
+            >
+              O
+            </div>
+            <div>
+              <span className="font-black text-lg tracking-tight" style={{ color: '#FFFFFF', letterSpacing: '-0.04em' }}>
+                ORNITH
+              </span>
+              <span
+                className="text-[9px] font-bold block -mt-0.5 tracking-widest uppercase"
+                style={{ color: 'rgba(237,203,150,0.7)' }}
+              >
+                Hyperlocal Network
+              </span>
+            </div>
+          </Link>
+
+          {/* Desktop Nav */}
+          <nav className={`${isAuthPage ? 'hidden' : 'hidden md:flex'} items-center gap-0.5`}>
+            {NAV_ITEMS.map((item) => {
+              const active = isActive(item.href);
+              const Icon = item.icon;
               return (
-                <button
-                  key={u.email}
-                  onClick={() => handleDemoSwitch(u.email)}
-                  disabled={isSwitching}
-                  className={`px-2 py-0.5 rounded text-[11px] font-medium transition-all ${
-                    isSelected
-                      ? 'bg-indigo-600 text-white font-bold ring-1 ring-white'
-                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                  }`}
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-all"
+                  style={{
+                    background: active ? `${item.activeColor}18` : 'transparent',
+                    color: active ? item.activeColor : 'rgba(255,255,255,0.5)',
+                  }}
                 >
-                  {u.name}
-                </button>
+                  <Icon className="w-4 h-4" />
+                  <span>{item.label}</span>
+                </Link>
               );
             })}
-          </div>
-        </div>
+          </nav>
 
-        {/* Main Navbar */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            {/* Brand Logo */}
-            <Link href="/feed" className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-xl shadow-md shadow-indigo-200">
-                O
-              </div>
-              <div>
-                <span className="font-extrabold text-xl tracking-tight text-slate-900">ORNITH</span>
-                <span className="text-xs text-indigo-600 font-semibold block -mt-1">Hyperlocal Network</span>
-              </div>
-            </Link>
-
-            {/* Desktop Nav Links */}
-            <nav className="hidden md:flex items-center gap-1">
-              <Link
-                href="/feed"
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition ${
-                  pathname === '/feed' || pathname === '/' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                <Radio className="w-4 h-4 text-indigo-600" />
-                <span>Help Radar</span>
-              </Link>
-
-              <Link
-                href="/rides"
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition ${
-                  pathname === '/rides' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                <Car className="w-4 h-4 text-emerald-600" />
-                <span>Rides</span>
-              </Link>
-
-              <Link
-                href="/plans"
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition ${
-                  pathname.startsWith('/plans') ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                <Users className="w-4 h-4 text-amber-600" />
-                <span>Plans & Expenses</span>
-              </Link>
-
-              <Link
-                href="/marketplace"
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition ${
-                  pathname === '/marketplace' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                <ShoppingBag className="w-4 h-4 text-purple-600" />
-                <span>Marketplace</span>
-              </Link>
-
-              <Link
-                href="/chat"
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition ${
-                  pathname.startsWith('/chat') ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                <MessageSquare className="w-4 h-4 text-blue-600" />
-                <span>Chat</span>
-              </Link>
-
-              <Link
-                href="/moderation"
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition ${
-                  pathname === '/moderation' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                <ShieldAlert className="w-4 h-4 text-rose-600" />
-                <span>Safety</span>
-              </Link>
-            </nav>
-
-            {/* Action Buttons */}
-            <div className="flex items-center gap-3">
-              <Link
-                href="/notifications"
-                className="relative p-2 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 transition"
-                title="Notifications"
-              >
-                <Bell className="w-4 h-4" />
-                {currentUser?.unreadNotificationsCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-indigo-600 text-white rounded-full text-[10px] font-bold flex items-center justify-center">
-                    {currentUser.unreadNotificationsCount}
-                  </span>
-                )}
-              </Link>
-
-              <Link
-                href="/posts/create"
-                className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 rounded-lg text-sm font-semibold shadow-sm transition"
-              >
-                <PlusCircle className="w-4 h-4" />
-                <span className="hidden sm:inline">Post Intent</span>
-              </Link>
-
-              {/* Profile Info */}
-              {currentUser && (
-                <Link
-                  href="/profile"
-                  className="flex items-center gap-2 p-1.5 rounded-lg border border-slate-200 hover:border-indigo-300 bg-slate-50 hover:bg-indigo-50/50 transition"
+          {/* Right Actions */}
+          <div className="flex items-center gap-2">
+            {isAuthPage && <Link href="/feed" className="px-3 py-2 rounded-xl text-sm font-semibold text-white/75 hover:text-white">Explore Radar</Link>}
+            {!isAuthPage && !currentUser && (
+              <Link href="/auth" className="px-3 py-2 rounded-xl text-sm font-bold text-white/80 hover:bg-white/10">Sign in</Link>
+            )}
+            {/* Notifications */}
+            {!isAuthPage && <Link
+              href="/notifications"
+              className="relative p-2 rounded-xl transition-all"
+              style={{ color: 'rgba(255,255,255,0.5)' }}
+              title="Notifications"
+            >
+              <Bell className="w-5 h-5" />
+              {currentUser?.unreadNotificationsCount > 0 && (
+                <span
+                  className="absolute top-1 right-1 w-4 h-4 rounded-full text-[9px] font-black flex items-center justify-center"
+                  style={{ background: '#ED6A5A', color: '#FFFFFF' }}
                 >
-                  <div className="w-7 h-7 rounded-full bg-indigo-200 text-indigo-800 font-bold flex items-center justify-center text-xs overflow-hidden">
-                    {currentUser.avatar ? (
-                      <img src={currentUser.avatar} alt={currentUser.name} className="w-full h-full object-cover" />
-                    ) : (
-                      currentUser.name.charAt(0)
-                    )}
-                  </div>
-                  <div className="text-left hidden lg:block">
-                    <div className="text-xs font-bold text-slate-800 leading-none flex items-center gap-1">
-                      {currentUser.name}
-                      {currentUser.isVerified && <CheckCircle2 className="w-3 h-3 text-blue-500 fill-blue-50" />}
-                    </div>
-                    <div className="text-[10px] text-slate-500 font-medium">
-                      L{currentUser.level} • {currentUser.trustScore}★ Trust
-                    </div>
-                  </div>
-                </Link>
+                  {currentUser.unreadNotificationsCount}
+                </span>
               )}
-            </div>
+            </Link>}
+
+            {/* Create CTA */}
+            {!isAuthPage && <Link
+              href="/posts/create"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold shadow-lg transition-all"
+              style={{ background: '#ED6A5A', color: '#FFFFFF' }}
+            >
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">Post Intent</span>
+            </Link>}
+
+            {/* Profile */}
+            {!isAuthPage && currentUser && (
+              <Link
+                href="/profile"
+                className="flex items-center gap-1.5 p-1 rounded-xl transition-all"
+                style={{ background: 'rgba(255,255,255,0.06)' }}
+              >
+                <div
+                  className="w-8 h-8 rounded-full font-bold text-sm flex items-center justify-center overflow-hidden"
+                  style={{ background: '#57886C', color: '#FFFFFF' }}
+                >
+                  {currentUser.avatar ? (
+                    <img src={currentUser.avatar} alt={currentUser.name} className="w-full h-full object-cover" />
+                  ) : (
+                    getInitials(currentUser.name)
+                  )}
+                </div>
+                <div className="text-left hidden lg:block pr-1">
+                  <div className="text-xs font-bold flex items-center gap-1" style={{ color: '#FFFFFF' }}>
+                    {currentUser.name}
+                    {currentUser.isVerified && <CheckCircle2 className="w-3 h-3" style={{ color: '#7AAF8F' }} />}
+                  </div>
+                  <div className="text-[10px]" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                    L{currentUser.level} · {currentUser.trustScore}★
+                  </div>
+                </div>
+              </Link>
+            )}
           </div>
         </div>
       </header>
 
-      {/* MOBILE BOTTOM NAVIGATION BAR */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-slate-900 border-t border-slate-800 px-2 py-2 flex items-center justify-around text-white shadow-2xl">
+      {/* Click outside to close demo picker */}
+      {!isAuthPage && showDemoPicker && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setShowDemoPicker(false)}
+        />
+      )}
+
+      {/* ── MOBILE BOTTOM NAV ── */}
+      <div
+        className={`${isAuthPage ? 'hidden' : 'md:hidden fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around bottom-nav'}`}
+        style={{
+          background: '#1E1E24',
+          borderTop: '1px solid rgba(255,255,255,0.08)',
+        }}
+      >
+        {/* Radar */}
         <Link
           href="/feed"
-          className={`flex flex-col items-center gap-0.5 p-1 rounded-lg text-[10px] font-semibold ${
-            pathname === '/feed' || pathname === '/' ? 'text-amber-400 font-bold' : 'text-slate-400'
-          }`}
+          className="flex flex-col items-center gap-0.5 py-2 px-2 min-w-[48px]"
+          style={{ color: isActive('/feed') ? '#ED6A5A' : 'rgba(255,255,255,0.35)' }}
         >
           <Radio className="w-5 h-5" />
-          <span>Radar</span>
+          <span className="text-[10px]" style={{ fontWeight: isActive('/feed') ? 700 : 500 }}>Radar</span>
         </Link>
 
-        <Link
-          href="/rides"
-          className={`flex flex-col items-center gap-0.5 p-1 rounded-lg text-[10px] font-semibold ${
-            pathname === '/rides' ? 'text-emerald-400 font-bold' : 'text-slate-400'
-          }`}
-        >
-          <Car className="w-5 h-5" />
-          <span>Rides</span>
-        </Link>
-
+        {/* Plans */}
         <Link
           href="/plans"
-          className={`flex flex-col items-center gap-0.5 p-1 rounded-lg text-[10px] font-semibold ${
-            pathname.startsWith('/plans') ? 'text-amber-400 font-bold' : 'text-slate-400'
-          }`}
+          className="flex flex-col items-center gap-0.5 py-2 px-2 min-w-[48px]"
+          style={{ color: isActive('/plans') ? '#EDCB96' : 'rgba(255,255,255,0.35)' }}
         >
           <Users className="w-5 h-5" />
-          <span>Plans</span>
+          <span className="text-[10px]" style={{ fontWeight: isActive('/plans') ? 700 : 500 }}>Plans</span>
         </Link>
 
+        {/* Center CREATE button */}
+        <Link
+          href="/posts/create"
+          className="flex flex-col items-center gap-0.5 py-1 px-2 -mt-4"
+        >
+          <div
+            className="w-13 h-13 rounded-2xl flex items-center justify-center shadow-xl"
+            style={{ background: '#ED6A5A', width: '52px', height: '52px' }}
+          >
+            <Plus className="w-6 h-6 text-white" />
+          </div>
+          <span className="text-[9px] text-white/40 mt-0.5">Post</span>
+        </Link>
+
+        {/* Market */}
         <Link
           href="/marketplace"
-          className={`flex flex-col items-center gap-0.5 p-1 rounded-lg text-[10px] font-semibold ${
-            pathname === '/marketplace' ? 'text-purple-400 font-bold' : 'text-slate-400'
-          }`}
+          className="flex flex-col items-center gap-0.5 py-2 px-2 min-w-[48px]"
+          style={{ color: isActive('/marketplace') ? '#D8D8F6' : 'rgba(255,255,255,0.35)' }}
         >
           <ShoppingBag className="w-5 h-5" />
-          <span>Market</span>
+          <span className="text-[10px]" style={{ fontWeight: isActive('/marketplace') ? 700 : 500 }}>Market</span>
         </Link>
 
+        {/* Chat */}
         <Link
           href="/chat"
-          className={`flex flex-col items-center gap-0.5 p-1 rounded-lg text-[10px] font-semibold ${
-            pathname.startsWith('/chat') ? 'text-blue-400 font-bold' : 'text-slate-400'
-          }`}
+          className="flex flex-col items-center gap-0.5 py-2 px-2 min-w-[48px]"
+          style={{ color: isActive('/chat') ? '#ED6A5A' : 'rgba(255,255,255,0.35)' }}
         >
           <MessageSquare className="w-5 h-5" />
-          <span>Chat</span>
+          <span className="text-[10px]" style={{ fontWeight: isActive('/chat') ? 700 : 500 }}>Chat</span>
         </Link>
       </div>
     </>

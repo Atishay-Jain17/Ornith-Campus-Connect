@@ -13,6 +13,7 @@ export async function GET() {
       where: { id: session.id },
       include: {
         verification: true,
+        trustReceived: { select: { feedbackAttribute: true } },
         _count: {
           select: {
             posts: true,
@@ -43,6 +44,7 @@ export async function GET() {
         isVerified: user.isVerified,
         role: user.role,
         verification: user.verification,
+        trustAttributes: Array.from(new Set(user.trustReceived.map((event) => event.feedbackAttribute.replaceAll('_', ' ')))),
         unreadNotificationsCount: user._count.notifications,
         postsCount: user._count.posts,
         plansCount: user._count.createdPlans,

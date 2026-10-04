@@ -16,6 +16,16 @@ export async function GET(request: Request) {
     const status = searchParams.get('status') || 'ACTIVE';
 
     const whereClause: any = {};
+    const session = await getCurrentUser();
+    if (session) {
+      const blocks = await prisma.userBlock.findMany({
+        where: { OR: [{ blockerId: session.id }, { blockedUserId: session.id }] },
+        select: { blockerId: true, blockedUserId: true },
+      });
+      const hiddenAuthors = new Set<string>();
+      for (const block of blocks) hiddenAuthors.add(block.blockerId === session.id ? block.blockedUserId : block.blockerId);
+      if (hiddenAuthors.size) whereClause.authorId = { notIn: Array.from(hiddenAuthors) };
+    }
     if (status !== 'ALL') {
       whereClause.status = status;
     }
@@ -27,6 +37,12 @@ export async function GET(request: Request) {
         { title: { contains: search } },
         { description: { contains: search } },
         { tags: { contains: search } },
+      ];
+    }
+    if (status === 'ACTIVE') {
+      whereClause.AND = [
+        ...(whereClause.AND || []),
+        { OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] },
       ];
     }
 
@@ -44,7 +60,6 @@ export async function GET(request: Request) {
             area: true,
           },
         },
-        interests: true,
         _count: {
           select: { matchesSource: true, chats: true },
         },
@@ -64,7 +79,9 @@ export async function GET(request: Request) {
       })
       .filter((post) => post.isWithinRadius);
 
-    return NextResponse.json({ posts: postsWithDistance });
+    // Keep precise coordinates private. Discovery uses distance and area only.
+    const publicPosts = postsWithDistance.map(({ latitude, longitude, ...post }) => post);
+    return NextResponse.json({ posts: publicPosts });
   } catch (error) {
     console.error('Fetch posts error:', error);
     return NextResponse.json({ error: 'Failed to fetch posts' }, { status: 500 });
@@ -89,6 +106,14 @@ export async function POST(request: Request) {
     const finalDesc = customDescription || rawText || '';
     const finalCategory = extracted?.category || 'General';
     const finalRadius = radiusKm ? parseFloat(radiusKm) : extracted?.radiusKm || 2.0;
+    const allowedTypes = ['NEED', 'OFFER', 'BORROW', 'LEND', 'BUY', 'SELL', 'GIVE', 'RENT', 'SERVICE', 'PLAN', 'RIDE', 'GROUP_BUY', 'COMMUNITY', 'OPPORTUNITY', 'LOST_FOUND'];
+    const allowedContributionModes = ['FREE', 'EQUAL_SPLIT', 'FIXED', 'CUSTOM'];
+    const parsedPrice = price !== undefined && price !== null && price !== '' ? Number(price) : extracted?.price;
+    const parsedCapacity = capacity !== undefined && capacity !== null && capacity !== '' ? Number(capacity) : extracted?.capacity;
+    const parsedDeparture = departureTime ? new Date(departureTime) : null;
+    if (!allowedTypes.includes(finalType) || typeof finalTitle !== 'string' || !finalTitle.trim() || finalTitle.length > 120 || typeof finalDesc !== 'string' || finalDesc.length > 3000 || !Number.isFinite(finalRadius) || finalRadius <= 0 || (parsedPrice !== undefined && parsedPrice !== null && (!Number.isFinite(parsedPrice) || parsedPrice < 0)) || (parsedCapacity !== undefined && parsedCapacity !== null && (!Number.isInteger(parsedCapacity) || parsedCapacity < 1 || parsedCapacity > 50)) || (parsedDeparture && !Number.isFinite(parsedDeparture.getTime()))) {
+      return NextResponse.json({ error: 'Review the title, description, radius, price, seats, and time, then try again.' }, { status: 400 });
+    }
 
     // Enforce Level 5 Gate for OPPORTUNITY posts (PDF Section 8 & 10)
     if (finalType === 'OPPORTUNITY') {
@@ -108,21 +133,23 @@ export async function POST(request: Request) {
         title: finalTitle,
         description: finalDesc,
         category: finalCategory,
-        latitude: latitude || 30.2687,
-        longitude: longitude || 78.0076,
-        areaName: areaName || 'Graphic Era Area',
+        latitude: 30.2687,
+        longitude: 78.0076,
+        areaName: typeof areaName === 'string' ? areaName.trim().slice(0, 80) : 'Graphic Era Area',
         radiusKm: finalRadius,
         routeOrigin: routeOrigin || extracted?.routeOrigin || null,
         routeDestination: routeDestination || extracted?.routeDestination || null,
-        departureTime: departureTime ? new Date(departureTime) : null,
-        capacity: capacity ? parseInt(capacity) : extracted?.capacity || null,
-        price: price ? parseFloat(price) : extracted?.price || null,
-        contributionMode: contributionMode || extracted?.contributionMode || 'FREE',
+        departureTime: parsedDeparture,
+        capacity: parsedCapacity ?? null,
+        price: parsedPrice ?? null,
+        contributionMode: allowedContributionModes.includes(contributionMode) ? contributionMode : parsedPrice !== undefined ? 'FIXED' : extracted?.contributionMode || 'FREE',
         tags: JSON.stringify(extracted?.tags || []),
         riskIndicators: JSON.stringify(extracted?.riskIndicators || []),
-        expiresAt: extracted?.suggestedExpiryHours
-          ? new Date(Date.now() + extracted.suggestedExpiryHours * 3600 * 1000)
-          : null,
+        expiresAt: finalType === 'RIDE' && parsedDeparture
+          ? new Date(parsedDeparture.getTime() + 2 * 3600 * 1000)
+          : extracted?.suggestedExpiryHours
+            ? new Date(Date.now() + extracted.suggestedExpiryHours * 3600 * 1000)
+            : null,
       },
       include: {
         author: {
