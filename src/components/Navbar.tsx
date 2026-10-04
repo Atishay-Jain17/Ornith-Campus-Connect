@@ -175,6 +175,19 @@ export default function Navbar() {
           {/* Action Buttons */}
           <div className="flex items-center gap-3">
             <Link
+              href="/notifications"
+              className="relative p-2 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 transition"
+              title="Notifications"
+            >
+              <Bell className="w-4 h-4" />
+              {currentUser?.unreadNotificationsCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-indigo-600 text-white rounded-full text-[10px] font-bold flex items-center justify-center">
+                  {currentUser.unreadNotificationsCount}
+                </span>
+              )}
+            </Link>
+
+            <Link
               href="/posts/create"
               className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 rounded-lg text-sm font-semibold shadow-sm transition"
             >
